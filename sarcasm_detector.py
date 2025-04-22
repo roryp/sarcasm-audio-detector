@@ -7,55 +7,6 @@ from matplotlib.patches import Wedge, Circle
 import matplotlib.colors as mcolors
 from matplotlib.colors import LinearSegmentedColormap
 
-"""
-SARCASM AUDIO DETECTOR
-======================
-A tool for analyzing acoustic patterns in speech to detect sarcasm.
-Created: April 22, 2025
-
-SLIDE NOTES: AUDIO ANALYSIS FOR SARCASM DETECTION
-
-Slide 1: Audio Analysis Overview
-- This analysis extracts acoustic features from speech that can reveal sarcasm
-- Sarcasm relies on prosodic cues: pitch variations, timing, and emphasis patterns
-- Our visualizations capture these subtle emotional markers that text analysis misses
-- Using "The Void.mp3" as our case study for analysis
-
-Slide 2: Spectrogram Visualization
-- Spectrograms reveal frequency patterns over time, showing the "acoustic fingerprint" of speech
-- Sarcastic speech shows distinctive energy distributions across frequencies
-- Look for exaggerated emphasis patterns and unusual pitch contours
-- Higher energy in certain frequencies can indicate emotional incongruence typical of sarcasm
-
-Slide 3: Emotional Flow Visualization
-- This 4D scatter plot tracks emotional dynamics that correlate with sarcastic speech:
-  * X-axis (RMS): Represents vocal intensity/arousal - sarcasm often has distinctive emphasis patterns
-  * Y-axis (Spectral Centroid): Represents tonal "brightness"/valence - sarcasm frequently shows valence mismatch 
-  * Size: Indicates intensity of expression - larger points show emphasized segments
-  * Color gradient: Represents time progression - reveals the temporal pattern of emotional shifts
-
-Slide 4: Key Insights for Sarcasm Detection
-- Sarcasm creates distinctive patterns in the emotional flow visualization:
-  * Clusters showing high arousal but unexpected valence
-  * Temporal transitions that differ from sincere speech
-  * Exaggerated emphasis patterns visible as larger points
-- These acoustic patterns allow detection of sarcasm even when text analysis would fail
-- Next steps: Training ML models using these acoustic features to automatically detect sarcastic speech
-
-Slide 5: Emotional Wheel Mapping
-- The emotional flow visualization can be mapped to the emotion wheel model
-- Sarcasm typically involves oscillation between contrasting emotions:
-  * Movement between joy/ecstasy regions and disgust/loathing regions
-  * Rapid transitions through anger, surprise and acceptance areas
-  * These oscillation patterns are key indicators of emotional incongruence in sarcastic speech
-- Each region of our 2D emotion space corresponds to emotion categories on the wheel:
-  * Top-right: Joy, Ecstasy, Admiration (high arousal, positive valence)
-  * Bottom-right: Serenity, Acceptance, Trust (low arousal, positive valence)
-  * Top-left: Anger, Rage, Vigilance (high arousal, negative valence)
-  * Bottom-left: Sadness, Grief, Pensiveness (low arousal, negative valence)
-- Sarcastic patterns often show "emotional leaps" across opposite wheel sections
-"""
-
 file_path = 'The Void.mp3'  # or the full path to your file
 
 # 1) Figure out where the last 120 s start:
