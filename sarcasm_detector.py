@@ -3,21 +3,24 @@ import subprocess, io
 import soundfile as sf
 import librosa, librosa.display
 import matplotlib.pyplot as plt
-from matplotlib.patches import Wedge, Circle
-import matplotlib.colors as mcolors
-from matplotlib.colors import LinearSegmentedColormap
+import warnings
+from scipy.ndimage import gaussian_filter1d
 
-file_path = 'The Void.mp3'  # or the full path to your file
+file_path = 'voice.m4a'  # or the full path to your file
 
-# 1) Figure out where the last 120 s start:
-total_dur = librosa.get_duration(filename=file_path)
-start_sec = max(0, total_dur - 120.0)
+# 1) Get the total duration of the audio file - fixing the warning
+total_dur = librosa.get_duration(path=file_path)
+print(f"Total audio duration: {total_dur:.2f} seconds")
 
-# 2) Use ffmpeg to grab that segment as a 16 kHz mono WAV in-memory:
+# For short clips, analyze the entire file
+start_sec = 0
+duration_sec = total_dur
+
+# 2) Use ffmpeg to convert the entire audio as a 16 kHz mono WAV in-memory:
 cmd = [
     'ffmpeg',
     '-ss', str(start_sec),
-    '-t', '120',
+    '-t', str(duration_sec),
     '-i', file_path,
     '-ar', '16000',
     '-ac', '1',
@@ -31,128 +34,225 @@ wav_bytes, _ = proc.communicate()
 y, sr = sf.read(io.BytesIO(wav_bytes), dtype='float32')
 
 # --- Spectrogram ---
-n_fft = 1024
-hop_spec = 512
+n_fft = 512  # Smaller window for short audio
+hop_spec = 256
 D = np.abs(librosa.stft(y, n_fft=n_fft, hop_length=hop_spec))
 DB = librosa.amplitude_to_db(D, ref=np.max)
 
-plt.figure(figsize=(10, 4))
-plt.imshow(DB, origin='lower', aspect='auto', extent=[0, 120, 0, sr/2])
-plt.xlabel('Time (s)')
-plt.ylabel('Frequency (Hz)')
-plt.title('Spectrogram (Last 120 s)')
-plt.colorbar(format='%+2.0f dB')
-plt.tight_layout()
-plt.show()
+# --- Enhanced Feature Extraction for Dad Jokes ---
+# Use smaller frames for short audio, better for catching subtle tonal shifts
+frame_len = int(0.025 * sr)   # 25 ms frames for more precise analysis
+hop_len = int(frame_len * 0.4)  # 60% overlap for smoother transitions
 
-# --- Emotional Flow Scatter (4D) ---
-frame_len = int(0.05 * sr)   # 50 ms frames
-hop_len   = frame_len
-
-rms      = librosa.feature.rms(y=y, frame_length=frame_len, hop_length=hop_len)[0]
+# Basic audio features
+rms = librosa.feature.rms(y=y, frame_length=frame_len, hop_length=hop_len)[0]
 centroid = librosa.feature.spectral_centroid(y=y, sr=sr, hop_length=hop_len)[0]
-times    = np.arange(len(rms)) * (hop_len / sr)
+times = np.arange(len(rms)) * (hop_len / sr)
+
+# Advanced features for sarcasm detection
+rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr, hop_length=hop_len)[0]
+contrast = librosa.feature.spectral_contrast(y=y, sr=sr, hop_length=hop_len)
+contrast_mean = np.mean(contrast, axis=0)  # Average across frequency bands
+
+# Flat affect detection - key for deadpan dad jokes
+flatness = librosa.feature.spectral_flatness(y=y, hop_length=hop_len)[0]
+
+# Dad joke specific tempo metrics - punchline timing
+onset_env = librosa.onset.onset_strength(y=y, sr=sr, hop_length=hop_len)
+tempo, beats = librosa.beat.beat_track(onset_envelope=onset_env, sr=sr, hop_length=hop_len)
+
+# Advanced pitch analysis with better error handling
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    pitch, mag = librosa.piptrack(y=y, sr=sr, hop_length=hop_len)
+    
+# Get weighted average of pitch to emphasize stronger signals
+pitch_mean = np.zeros(pitch.shape[1])
+for i in range(pitch.shape[1]):
+    pitches = pitch[:, i]
+    magnitudes = mag[:, i]
+    
+    # Filter out zero values
+    nonzero = pitches > 0
+    if np.any(nonzero):
+        # Use magnitude as weights for pitch
+        pitch_mean[i] = np.sum(pitches[nonzero] * magnitudes[nonzero]) / np.sum(magnitudes[nonzero] + 1e-10)
+
+# === Dad Joke Specific Analysis ===
+# 1. Detect pauses - common before punchlines
+energy = librosa.feature.rms(y=y, hop_length=hop_len)[0]
+energy_mean = np.mean(energy)
+pauses = energy < (0.2 * energy_mean)  # 20% threshold for pause detection
+
+# 2. Pitch inflection - common in punchlines
+pitch_gradient = np.zeros_like(pitch_mean)
+pitch_gradient[1:] = np.diff(pitch_mean)
+pitch_inflections = np.abs(pitch_gradient) > np.std(pitch_gradient) * 1.5
+
+# 3. Find the punchline segment - likely in last third of joke
+punchline_region = slice(int(2*len(times)/3), len(times))
+setup_region = slice(0, int(2*len(times)/3))
+
+# 4. Laugh track or timing analysis - classic for dad jokes
+# Fix the dimension issue by making tempo a scalar
+tempo_changes = np.zeros_like(times)
+tempo_changes[1:] = np.diff(np.ones_like(times) * tempo)
 
 # Normalize to [0,1]
-rms_n  = (rms - rms.min()) / (rms.max() - rms.min())
-cent_n = (centroid - centroid.min()) / (centroid.max() - centroid.min())
+def safe_normalize(x):
+    if np.all(x == 0) or (np.max(x) - np.min(x)) == 0:
+        return np.zeros_like(x)
+    return (x - np.min(x)) / (np.max(x) - np.min(x))
 
-sizes  = rms_n * 100 + 10    # marker size ~ arousal
-colors = times              # color ~ time
+rms_n = safe_normalize(rms)
+cent_n = safe_normalize(centroid)
+rolloff_n = safe_normalize(rolloff)
+contrast_n = safe_normalize(contrast_mean)
+flatness_n = safe_normalize(flatness)
+pitch_n = safe_normalize(pitch_mean)
 
-plt.figure(figsize=(6, 6))
-plt.scatter(rms_n, cent_n, s=sizes, c=colors)
-plt.xlabel('Arousal Proxy (norm RMS)')
-plt.ylabel('Valence Proxy (norm Spectral Centroid)')
-plt.title('Emotional Flow Scatter (Last 120 s)')
-cbar = plt.colorbar()
-cbar.set_label('Time (s)')
-plt.tight_layout()
-plt.show()
+# Calculate pitch changes - useful for sarcasm detection
+pitch_changes = np.zeros_like(pitch_n)
+if len(pitch_n) > 1:
+    pitch_changes[1:] = np.abs(np.diff(pitch_n))
 
-# Define emotion regions based on the emotion wheel
-def add_emotion_wheel_overlay(ax, rms_range=(0,1), cent_range=(0,1), alpha=0.2):
-    # Define colors for different emotion regions
-    emotions = {
-        'joy_ecstasy': {'color': 'yellow', 'center': (0.75, 0.75), 'radius': 0.25},
-        'serenity_acceptance': {'color': 'lightgreen', 'center': (0.25, 0.75), 'radius': 0.25},
-        'anger_rage': {'color': 'red', 'center': (0.75, 0.25), 'radius': 0.25},
-        'sadness_grief': {'color': 'blue', 'center': (0.25, 0.25), 'radius': 0.25},
-        'surprise_amazement': {'color': 'cyan', 'center': (0.5, 0.85), 'radius': 0.25},
-        'fear_terror': {'color': 'darkgreen', 'center': (0.15, 0.5), 'radius': 0.25},
-        'disgust_loathing': {'color': 'magenta', 'center': (0.5, 0.15), 'radius': 0.25},
-        'anticipation_vigilance': {'color': 'orange', 'center': (0.85, 0.5), 'radius': 0.25},
-    }
+# === Enhanced Sarcasm Detection for Dad Jokes ===
+# Dad joke sarcasm is often more subtle: detected by timing, deadpan delivery, and slight inflections
+
+sarcasm_score = np.zeros(len(times))
+for i in range(1, len(times)):
+    # 1. Basic vocal changes (standard sarcasm indicators)
+    pitch_change = pitch_changes[i] if i < len(pitch_changes) else 0
+    rms_change = abs(rms_n[i] - rms_n[i-1])
+    cent_change = abs(cent_n[i] - cent_n[i-1])
     
-    # Add emotion regions
-    for emotion, props in emotions.items():
-        circle = plt.Circle(props['center'], props['radius'], color=props['color'], alpha=alpha, label=emotion)
-        ax.add_patch(circle)
-        ax.text(props['center'][0], props['center'][1], emotion.replace('_', '/'), 
-                ha='center', va='center', fontsize=8, color='black')
+    # 2. Dad joke specific features:
+    # - Flat affect (deadpan) followed by inflection
+    flatness_score = flatness_n[i] 
     
-    return ax
+    # - Spectral contrast (voice tone variation)
+    spec_contrast = contrast_n[i] if i < len(contrast_n) else 0
+    
+    # - Timing component - pauses before punchline
+    is_pause = 1.0 if pauses[i-1] and not pauses[i] else 0.0
+    
+    # 3. Position-based weighting (punchline region gets higher weight)
+    position_weight = 1.0
+    if i >= punchline_region.start:
+        position_weight = 2.0  # Double weight for punchline region
+    
+    # 4. Dad joke sarcasm formula: combines standard indicators with dad joke specific patterns
+    basic_sarcasm = (pitch_change * 0.3 + rms_change * 0.1 + cent_change * 0.1 + spec_contrast * 0.1)
+    dad_joke_specific = (flatness_score * 0.2 + is_pause * 0.2)
+    sarcasm_score[i] = (basic_sarcasm + dad_joke_specific) * position_weight
 
-# Create a figure with two subplots - one normal and one with emotion wheel
-plt.figure(figsize=(15, 6))
+# 5. Enhanced smoothing with edge preservation for punchline detection
+sarcasm_score_smooth = gaussian_filter1d(sarcasm_score, sigma=1.5)
 
-# Original scatter plot
-ax1 = plt.subplot(1, 2, 1)
-scatter = ax1.scatter(rms_n, cent_n, s=sizes, c=colors, cmap='viridis')
-ax1.set_xlabel('Arousal Proxy (norm RMS)')
-ax1.set_ylabel('Valence Proxy (norm Spectral Centroid)')
-ax1.set_title('Emotional Flow Scatter (Last 120 s)')
+# 6. Punchline boost - classic dad joke sarcasm appears at the punchline
+# Find the likely punchline (after pause, high contrast point in last third)
+if len(sarcasm_score_smooth) > 3:
+    punchline_candidates = []
+    for i in range(punchline_region.start, len(times)-1):
+        if pauses[i-1] and not pauses[i]:  # Transition from pause to speech
+            punchline_candidates.append(i)
+    
+    if punchline_candidates:
+        punchline_idx = punchline_candidates[-1]  # Last pause-to-speech transition
+        # Boost the punchline region
+        boost_region = slice(max(0, punchline_idx-3), min(len(sarcasm_score_smooth), punchline_idx+5))
+        sarcasm_score_smooth[boost_region] *= 1.5
+
+# Create a figure with Dad Joke analysis
+plt.figure(figsize=(15, 10))
+
+# Original scatter plot with sarcasm scoring
+ax1 = plt.subplot(2, 2, 1)
+scatter = ax1.scatter(rms_n, cent_n, s=50 + sarcasm_score_smooth * 200, c=times, cmap='viridis', alpha=0.7)
+ax1.set_xlabel('Loudness (normalized RMS)')
+ax1.set_ylabel('Pitch (normalized Spectral Centroid)')
+ax1.set_title('Dad Joke Delivery Analysis')
 cbar = plt.colorbar(scatter, ax=ax1)
 cbar.set_label('Time (s)')
 
-# Scatter plot with emotion wheel overlay
-ax2 = plt.subplot(1, 2, 2)
-scatter2 = ax2.scatter(rms_n, cent_n, s=sizes, c=colors, cmap='viridis', zorder=10)
-ax2 = add_emotion_wheel_overlay(ax2)
-ax2.set_xlim(0, 1)
-ax2.set_ylim(0, 1)
-ax2.set_xlabel('Arousal Proxy (norm RMS)')
-ax2.set_ylabel('Valence Proxy (norm Spectral Centroid)')
-ax2.set_title('Emotional Mapping to Emotion Wheel')
-cbar2 = plt.colorbar(scatter2, ax=ax2)
-cbar2.set_label('Time (s)')
+# Plot the sarcasm score over time
+ax2 = plt.subplot(2, 2, 2)
+ax2.plot(times, sarcasm_score_smooth, 'r-', linewidth=2)
+ax2.set_xlabel('Time (s)')
+ax2.set_ylabel('Sarcasm Score')
+ax2.set_title('Dad Joke Sarcasm Detection')
+ax2.grid(True, alpha=0.3)
+
+# Mark punchline region
+ax2.axvspan(times[punchline_region.start], times[-1], alpha=0.2, color='yellow', label='Punchline Region')
+
+# Find and mark the peak sarcasm point
+if len(sarcasm_score_smooth) > 0:
+    peak_idx = np.argmax(sarcasm_score_smooth)
+    ax2.axvline(x=times[peak_idx], color='blue', linestyle='--', 
+                label=f'Peak Sarcasm at {times[peak_idx]:.2f}s')
+    ax2.legend()
+
+# Plot the spectral features
+ax3 = plt.subplot(2, 2, 3)
+ax3.plot(times, rms_n, 'b-', label='Volume', alpha=0.7)
+ax3.plot(times, cent_n, 'g-', label='Pitch', alpha=0.7)
+ax3.plot(times, flatness_n, 'r-', label='Deadpan Factor', alpha=0.7)
+ax3.plot(times, contrast_n, 'c-', label='Vocal Expression', alpha=0.7)
+ax3.set_xlabel('Time (s)')
+ax3.set_ylabel('Normalized Value')
+ax3.set_title('Dad Joke Vocal Characteristics')
+ax3.legend()
+ax3.grid(True, alpha=0.3)
+
+# Plot pause detection - key for timing analysis
+ax4 = plt.subplot(2, 2, 4)
+ax4.plot(times, pauses.astype(float), 'k-', label='Pauses', alpha=0.7)
+ax4.plot(times, pitch_n, 'g-', label='Pitch', alpha=0.7)
+ax4.plot(times, pitch_changes, 'r-', label='Pitch Changes', alpha=0.7)
+ax4.set_xlabel('Time (s)')
+ax4.set_ylabel('Value')
+ax4.set_title('Joke Timing & Delivery')
+ax4.legend()
+ax4.grid(True, alpha=0.3)
 
 plt.tight_layout()
 
-# Add an analysis plot to visualize emotional transitions
-plt.figure(figsize=(10, 6))
-# Find indices where there's significant change in either dimension
-changes = []
-threshold = 0.1
-for i in range(1, len(rms_n)):
-    # Calculate distance between consecutive points in 2D emotion space
-    dist = np.sqrt((rms_n[i] - rms_n[i-1])**2 + (cent_n[i] - cent_n[i-1])**2)
-    if dist > threshold:
-        changes.append(i)
+# === Dad Joke Sarcasm Calibration ===
+# Dad jokes have specialized sarcasm thresholds
+# 1. Calculate overall metrics
+overall_sarcasm = np.mean(sarcasm_score_smooth)
+punchline_sarcasm = np.mean(sarcasm_score_smooth[punchline_region]) if len(sarcasm_score_smooth) > 0 else 0
+max_sarcasm = np.max(sarcasm_score_smooth) if len(sarcasm_score_smooth) > 0 else 0
 
-# Plot the emotional trajectory with highlighted transitions
-plt.plot(times, rms_n, 'b-', label='Arousal', alpha=0.7)
-plt.plot(times, cent_n, 'g-', label='Valence', alpha=0.7)
+# 2. Calculate dad joke specific sarcasm probability
+# Dad jokes have specialized metrics - sarcasm often comes from timing and delivery 
+# rather than traditional sarcasm indicators
+dad_joke_factor = 2.5  # Multiplier for dad jokes (they're subtly sarcastic)
+timing_quality = np.mean(pauses.astype(float)) * 3  # Good timing = pauses before punchline
+punchline_impact = max_sarcasm * 1.5  # Strong punchline = higher score
 
-# Highlight areas of rapid emotional shifts
-for c in changes:
-    plt.axvline(x=times[c], color='r', linestyle='--', alpha=0.3)
+# 3. Final sarcasm calculation for dad jokes
+overall_sarcasm_score = (overall_sarcasm * 5 + punchline_sarcasm * 10 + timing_quality + punchline_impact) * dad_joke_factor
 
-# Add markers for potential sarcasm indicators (where arousal and valence diverge)
-sarcasm_indicators = []
-for i in range(len(rms_n)):
-    # Look for points where arousal and valence have opposite values (one high, one low)
-    if (rms_n[i] > 0.7 and cent_n[i] < 0.3) or (rms_n[i] < 0.3 and cent_n[i] > 0.7):
-        sarcasm_indicators.append(i)
+# 4. Calibrate to percentage
+sarcasm_probability = min(95, max(5, overall_sarcasm_score * 100))
 
-for s in sarcasm_indicators:
-    plt.plot(times[s], rms_n[s], 'ro', markersize=8)
+# Print the results with more detail for dad jokes
+print("\n=== Dad Joke Sarcasm Analysis ===")
+print(f"Overall Sarcasm Score: {overall_sarcasm_score:.2f}/10")
+print(f"Sarcasm Probability: {sarcasm_probability:.1f}%")
+print(f"Punchline Impact: {punchline_impact:.2f}")
+print(f"Timing Quality: {timing_quality:.2f}")
 
-plt.xlabel('Time (s)')
-plt.ylabel('Normalized Value')
-plt.title('Emotional Transitions Analysis (Potential Sarcasm Indicators in Red)')
-plt.legend()
-plt.grid(alpha=0.3)
+# Verdict with dad joke specific interpretation
+if sarcasm_probability > 70:
+    print("Verdict: Highly sarcastic dad joke delivery!")
+elif sarcasm_probability > 40:
+    print("Verdict: Classic dad joke with moderate sarcasm")
+else:
+    print("Verdict: Straightforward dad joke delivery")
 
-plt.tight_layout()
+plt.suptitle(f"Dad Joke Analysis - Sarcasm Probability: {sarcasm_probability:.1f}%", fontsize=16)
+plt.tight_layout(rect=[0, 0, 1, 0.96])  # Make room for the suptitle
 plt.show()
