@@ -287,14 +287,41 @@ if len(sarcasm_score_smooth) > 3:
 # Create a figure with Dad Joke analysis
 plt.figure(figsize=(15, 10))
 
-# Original scatter plot with sarcasm scoring
+# Sentiment flow visualization - replacing the original scatter plot
 ax1 = plt.subplot(2, 2, 1)
-scatter = ax1.scatter(rms_n, cent_n, s=50 + sarcasm_score_smooth * 200, c=times, cmap='viridis', alpha=0.7)
-ax1.set_xlabel('Loudness (normalized RMS)')
-ax1.set_ylabel('Pitch (normalized Spectral Centroid)')
-ax1.set_title('Dad Joke Delivery Analysis')
-cbar = plt.colorbar(scatter, ax=ax1)
-cbar.set_label('Time (s)')
+
+# Calculate sentiment flow using a combination of audio features
+# Higher values indicate more positive sentiment, lower values more negative
+sentiment_values = (cent_n * 0.5) - (flatness_n * 0.3) + (pitch_n * 0.2)
+# Smooth the sentiment curve for better visualization
+sentiment_smooth = gaussian_filter1d(sentiment_values, sigma=2.0)
+
+# Plot the sentiment flow as a filled area
+ax1.plot(times, sentiment_smooth, 'b-', linewidth=2)
+ax1.fill_between(times, 0, sentiment_smooth, where=sentiment_smooth > 0, 
+                 color='lightblue', alpha=0.6, label='Positive Sentiment')
+ax1.fill_between(times, sentiment_smooth, 0, where=sentiment_smooth < 0, 
+                 color='lightcoral', alpha=0.6, label='Negative Sentiment')
+
+# Mark punchline region
+ax1.axvspan(times[punchline_region.start], times[-1], alpha=0.2, color='yellow', label='Punchline Region')
+
+# Highlight areas of rapid sentiment change (potential sarcasm indicators)
+sentiment_change = np.zeros_like(sentiment_smooth)
+sentiment_change[1:] = np.abs(np.diff(sentiment_smooth))
+threshold = np.percentile(sentiment_change, 90)  # Top 10% of changes
+highlight_points = sentiment_change > threshold
+
+for i in range(len(highlight_points)):
+    if highlight_points[i]:
+        ax1.axvline(x=times[i], color='green', linestyle='--', alpha=0.3)
+
+ax1.set_xlabel('Time (s)')
+ax1.set_ylabel('Sentiment Value')
+ax1.set_title('Sentiment Flow Analysis')
+ax1.legend(loc='upper right')
+ax1.grid(True, alpha=0.3)
+
 # Add transcribed text as an annotation
 ax1.annotate(f"Text: '{transcribed_text}'", xy=(0.05, 0.95), xycoords='axes fraction',
             fontsize=9, va='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
@@ -333,20 +360,62 @@ if len(sarcasm_score_smooth) > 0:
                 label=f'Peak Sarcasm at {times[peak_idx]:.2f}s')
     ax2.legend()
 
-# Plot the spectral features
+# Plot the spectral features - FLAME GRAPH STYLE SPECTROGRAM
 ax3 = plt.subplot(2, 2, 3)
-ax3.plot(times, rms_n, 'b-', label='Volume', alpha=0.7)
-ax3.plot(times, cent_n, 'g-', label='Pitch', alpha=0.7)
-ax3.plot(times, flatness_n, 'r-', label='Deadpan Factor', alpha=0.7)
-ax3.plot(times, contrast_n, 'c-', label='Vocal Expression', alpha=0.7)
-ax3.set_xlabel('Time (s)')
-ax3.set_ylabel('Normalized Value')
-ax3.set_title('Dad Joke Vocal Characteristics')
-ax3.legend()
-ax3.grid(True, alpha=0.3)
-# Add transcribed text to this plot as well
-ax3.annotate(f"Text: '{transcribed_text}'", xy=(0.05, 0.05), xycoords='axes fraction',
-            fontsize=9, va='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
+
+# Create a flame graph style spectrogram with higher resolution
+S_dB = librosa.amplitude_to_db(np.abs(librosa.stft(y, n_fft=2048, hop_length=512)), ref=np.max)
+
+# Create a custom blue-based colormap instead of flame
+from matplotlib.colors import LinearSegmentedColormap
+colors = [(0, 0, 0), (0, 0, 0.5), (0, 0.2, 0.8), (0, 0.6, 1), (0.2, 1, 1)]
+blue_cmap = LinearSegmentedColormap.from_list('blue', colors)
+
+# Display the blue-style spectrogram
+img = librosa.display.specshow(
+    S_dB, 
+    sr=sr, 
+    hop_length=512, 
+    x_axis='time', 
+    y_axis='log',  # Log scale for frequency to better show speech patterns
+    cmap=blue_cmap,
+    ax=ax3
+)
+
+# Set background color to black for higher contrast
+ax3.set_facecolor('black')
+
+# Enhance the title and labels with custom styling
+ax3.set_title('Spectrogram Visualization', fontsize=14, fontweight='bold', color='#3080B5')
+ax3.set_xlabel('Time (s)', fontsize=10, color='#3080B5')
+ax3.set_ylabel('Frequency (Hz)', fontsize=10, color='#3080B5')
+
+# Style the axis tick labels
+ax3.tick_params(axis='x', colors='#3080B5')
+ax3.tick_params(axis='y', colors='#3080B5')
+
+# Add colorbar with better formatting
+colorbar = plt.colorbar(img, ax=ax3, format='%+2.0f dB')
+colorbar.set_label('Amplitude (dB)', color='#3080B5')
+colorbar.ax.yaxis.set_tick_params(color='#3080B5')
+plt.setp(plt.getp(colorbar.ax, 'yticklabels'), color='#3080B5')
+
+# Focus on the relevant frequencies for speech
+ax3.set_ylim([50, 8000])  # Limit to most relevant speech frequencies
+
+# Add high sarcasm region highlighting
+high_sarcasm_regions = sarcasm_score_smooth > np.percentile(sarcasm_score_smooth, 80)
+for i in range(1, len(high_sarcasm_regions)):
+    if high_sarcasm_regions[i] and not high_sarcasm_regions[i-1]:  # Start of high region
+        start_idx = i
+    elif not high_sarcasm_regions[i] and high_sarcasm_regions[i-1]:  # End of high region
+        # Convert time indices to actual times for the spectrogram
+        start_time = times[start_idx]
+        end_time = times[i]
+        ax3.axvspan(start_time, end_time, color='yellow', alpha=0.15)
+
+# Remove grid for cleaner look
+ax3.grid(False)
 
 # Plot pause detection - key for timing analysis
 ax4 = plt.subplot(2, 2, 4)
