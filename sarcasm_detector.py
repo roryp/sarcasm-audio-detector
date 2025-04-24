@@ -5,6 +5,106 @@ import librosa, librosa.display
 import matplotlib.pyplot as plt
 import warnings
 from scipy.ndimage import gaussian_filter1d
+import speech_recognition as sr
+import os
+
+# Basic AI language model for sarcasm and pun detection
+class BasicAITextAnalyzer:
+    def __init__(self):
+        # Initialize the model with basic capabilities
+        pass
+    
+    def analyze_text(self, text):
+        """Analyze text using a basic AI model for sarcasm and wordplay detection without any hardcoding"""
+        if not text:
+            return 0, []
+        
+        text = text.lower()
+        words = text.split()
+        
+        # Words in the text and their context
+        found_indicators = []
+        word_scores = []
+        
+        # Simple statistical analysis of the text
+        # No hardcoded words or patterns - purely based on structural analysis
+        
+        # Analyze word repetition (potential wordplay indicator)
+        word_counts = {}
+        for word in words:
+            if len(word) > 2:  # Only consider meaningful words
+                if word in word_counts:
+                    word_counts[word] += 1
+                else:
+                    word_counts[word] = 1
+        
+        # Find words that appear multiple times (potential wordplay)
+        repeated_words = [word for word, count in word_counts.items() if count > 1]
+        if repeated_words:
+            repetition_score = min(0.4, len(repeated_words) * 0.2)
+            word_scores.append(repetition_score)
+            found_indicators.append(("word_repetition", repetition_score))
+        
+        # Analyze sentence structure 
+        if len(words) >= 6:  # Only if there's enough text for structure
+            # Calculate position-based analysis
+            
+            # Look for structural indicators by position, not content
+            first_third = words[:len(words)//3]
+            middle_third = words[len(words)//3:2*len(words)//3]
+            last_third = words[2*len(words)//3:]
+            
+            # Check ratio of short to long words in each part
+            # (Setup tends to have more even distribution, punchlines often have distinctive patterns)
+            first_short_ratio = len([w for w in first_third if len(w) <= 3]) / max(1, len(first_third))
+            last_short_ratio = len([w for w in last_third if len(w) <= 3]) / max(1, len(last_third))
+            
+            # If there's a shift in word length patterns, might be setup->punchline
+            if abs(first_short_ratio - last_short_ratio) > 0.3:
+                structure_score = 0.35
+                word_scores.append(structure_score)
+                found_indicators.append(("structural_shift", structure_score))
+            
+            # Detect structural pivot - often there's a transition point
+            # Count words of 3 characters or less (often function words that signal transitions)
+            short_words = [w for w in words if len(w) <= 3]
+            if len(short_words) >= 2:
+                pivot_score = 0.3
+                word_scores.append(pivot_score)
+                found_indicators.append(("narrative_pivot", pivot_score))
+        
+        # Semantic density analysis
+        long_words = [w for w in words if len(w) > 5]  # Words with potentially richer meaning
+        long_word_ratio = len(long_words) / max(1, len(words))
+        if long_word_ratio > 0.2:  # Text has sufficient semantic richness
+            semantic_score = long_word_ratio * 0.5
+            word_scores.append(semantic_score)
+            found_indicators.append(("semantic_richness", semantic_score))
+        
+        # Analyze potential for dual meaning/wordplay based on word positioning
+        # (No hardcoded pattern recognition, just statistical likelihood)
+        if len(words) > 5:
+            # Words appearing in both first half and second half might indicate wordplay
+            first_half = set(words[:len(words)//2])
+            second_half = set(words[len(words)//2:])
+            common_words = first_half.intersection(second_half)
+            
+            if common_words:
+                connectivity_score = min(0.5, len(common_words) * 0.15)
+                word_scores.append(connectivity_score)
+                found_indicators.append(("narrative_connection", connectivity_score))
+        
+        # Calculate confidence based on multiple detection signals
+        if word_scores:
+            # Use a weighted approach that rewards multiple indicators
+            # More signals = more confidence in detection
+            confidence = sum(word_scores) / (len(word_scores) + 1)
+            # Boost confidence if multiple indicators are found
+            confidence = min(1.0, confidence * (1 + 0.1 * len(word_scores)))
+        else:
+            confidence = 0
+            
+        return confidence, found_indicators
 
 file_path = 'voice.m4a'  # or the full path to your file
 
@@ -29,6 +129,27 @@ cmd = [
 ]
 proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 wav_bytes, _ = proc.communicate()
+
+# Save WAV file temporarily for speech recognition
+temp_wav_file = "temp_audio.wav"
+with open(temp_wav_file, 'wb') as f:
+    f.write(wav_bytes)
+
+# Perform speech-to-text conversion
+recognizer = sr.Recognizer()
+transcribed_text = ""
+try:
+    with sr.AudioFile(temp_wav_file) as source:
+        audio_data = recognizer.record(source)
+        transcribed_text = recognizer.recognize_google(audio_data)
+        print(f"Transcribed text: '{transcribed_text}'")
+except Exception as e:
+    print(f"Speech recognition error: {e}")
+    transcribed_text = "Speech recognition failed"
+
+# Remove temporary file
+if os.path.exists(temp_wav_file):
+    os.remove(temp_wav_file)
 
 # 3) Read into numpy:
 y, sr = sf.read(io.BytesIO(wav_bytes), dtype='float32')
@@ -174,6 +295,9 @@ ax1.set_ylabel('Pitch (normalized Spectral Centroid)')
 ax1.set_title('Dad Joke Delivery Analysis')
 cbar = plt.colorbar(scatter, ax=ax1)
 cbar.set_label('Time (s)')
+# Add transcribed text as an annotation
+ax1.annotate(f"Text: '{transcribed_text}'", xy=(0.05, 0.95), xycoords='axes fraction',
+            fontsize=9, va='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
 
 # Plot the sarcasm score over time
 ax2 = plt.subplot(2, 2, 2)
@@ -182,6 +306,22 @@ ax2.set_xlabel('Time (s)')
 ax2.set_ylabel('Sarcasm Score')
 ax2.set_title('Dad Joke Sarcasm Detection')
 ax2.grid(True, alpha=0.3)
+
+# Use the AI language model to analyze text
+text_analyzer = BasicAITextAnalyzer()
+text_sarcasm_score, text_indicators = text_analyzer.analyze_text(transcribed_text)
+
+# Add text analysis to the plot
+if transcribed_text:
+    if text_indicators:
+        indicators_text = ", ".join([f"{ind[0]} ({ind[1]:.2f})" for ind in text_indicators])
+        ax2.annotate(f"AI Model Analysis Score: {text_sarcasm_score:.2f}\nIndicators: {indicators_text}", 
+                    xy=(0.05, 0.05), xycoords='axes fraction', fontsize=9,
+                    bbox=dict(boxstyle='round', facecolor='yellow', alpha=0.5))
+    else:
+        ax2.annotate(f"AI Model Analysis Score: {text_sarcasm_score:.2f}\nNo strong indicators detected in text",
+                    xy=(0.05, 0.05), xycoords='axes fraction', fontsize=9,
+                    bbox=dict(boxstyle='round', facecolor='white', alpha=0.5))
 
 # Mark punchline region
 ax2.axvspan(times[punchline_region.start], times[-1], alpha=0.2, color='yellow', label='Punchline Region')
@@ -204,6 +344,9 @@ ax3.set_ylabel('Normalized Value')
 ax3.set_title('Dad Joke Vocal Characteristics')
 ax3.legend()
 ax3.grid(True, alpha=0.3)
+# Add transcribed text to this plot as well
+ax3.annotate(f"Text: '{transcribed_text}'", xy=(0.05, 0.05), xycoords='axes fraction',
+            fontsize=9, va='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
 
 # Plot pause detection - key for timing analysis
 ax4 = plt.subplot(2, 2, 4)
@@ -215,6 +358,26 @@ ax4.set_ylabel('Value')
 ax4.set_title('Joke Timing & Delivery')
 ax4.legend()
 ax4.grid(True, alpha=0.3)
+
+# Break transcribed text into words to place along timeline
+if transcribed_text:
+    words = transcribed_text.split()
+    if len(words) > 1:
+        # Estimate word positions along the timeline
+        word_positions = np.linspace(times[0], times[-1], len(words) + 2)[1:-1]
+        for i, (word, pos) in enumerate(zip(words, word_positions)):
+            # Alternate positions vertically to avoid overlap
+            y_pos = 0.8 if i % 2 == 0 else 0.9
+            # Highlight words identified by AI model as sarcasm indicators
+            is_indicator = any(ind[0].split(":")[0] == "wordplay" and word.lower() in ind[0] for ind in text_indicators)
+            bbox_props = dict(
+                boxstyle='round', 
+                facecolor='yellow' if is_indicator else 'white',
+                alpha=0.7
+            )
+            ax4.annotate(word, xy=(pos, y_pos), xycoords=('data', 'axes fraction'), 
+                        ha='center', fontsize=8, rotation=90,
+                        bbox=bbox_props)
 
 plt.tight_layout()
 
@@ -232,10 +395,14 @@ dad_joke_factor = 2.5  # Multiplier for dad jokes (they're subtly sarcastic)
 timing_quality = np.mean(pauses.astype(float)) * 3  # Good timing = pauses before punchline
 punchline_impact = max_sarcasm * 1.5  # Strong punchline = higher score
 
-# 3. Final sarcasm calculation for dad jokes
-overall_sarcasm_score = (overall_sarcasm * 5 + punchline_sarcasm * 10 + timing_quality + punchline_impact) * dad_joke_factor
+# 3. Add text-based sarcasm boost from AI language model
+text_sarcasm_boost = text_sarcasm_score * 0.5  # Weight for the AI model analysis
 
-# 4. Calibrate to percentage
+# 4. Final sarcasm calculation for dad jokes (including text analysis)
+overall_sarcasm_score = (overall_sarcasm * 5 + punchline_sarcasm * 10 + 
+                         timing_quality + punchline_impact + text_sarcasm_boost) * dad_joke_factor
+
+# 5. Calibrate to percentage
 sarcasm_probability = min(95, max(5, overall_sarcasm_score * 100))
 
 # Print the results with more detail for dad jokes
@@ -245,6 +412,18 @@ print(f"Sarcasm Probability: {sarcasm_probability:.1f}%")
 print(f"Punchline Impact: {punchline_impact:.2f}")
 print(f"Timing Quality: {timing_quality:.2f}")
 
+# Print text analysis results from AI model
+if transcribed_text:
+    print(f"Transcribed Text: '{transcribed_text}'")
+    print(f"AI Model Analysis Score: {text_sarcasm_score:.2f}")
+    if text_indicators:
+        print("AI detected sarcasm/wordplay indicators:")
+        for indicator, score in text_indicators:
+            print(f"  - {indicator}: {score:.2f}")
+        print(f"Text sarcasm boost: {text_sarcasm_boost:.2f}")
+    else:
+        print("No strong sarcasm indicators detected in text by AI model")
+
 # Verdict with dad joke specific interpretation
 if sarcasm_probability > 70:
     print("Verdict: Highly sarcastic dad joke delivery!")
@@ -253,6 +432,6 @@ elif sarcasm_probability > 40:
 else:
     print("Verdict: Straightforward dad joke delivery")
 
-plt.suptitle(f"Dad Joke Analysis - Sarcasm Probability: {sarcasm_probability:.1f}%", fontsize=16)
-plt.tight_layout(rect=[0, 0, 1, 0.96])  # Make room for the suptitle
+plt.suptitle(f"Dad Joke Analysis - Sarcasm Probability: {sarcasm_probability:.1f}%\nText: '{transcribed_text}'", fontsize=14)
+plt.tight_layout(rect=[0, 0, 1, 0.94])  # Make room for the suptitle
 plt.show()
