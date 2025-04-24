@@ -1,9 +1,10 @@
 # Sarcasm Audio Detector
 
-A tool for analyzing acoustic patterns in speech to detect sarcasm.
+A sophisticated audio analysis tool for detecting sarcasm in speech with specialized support for dad jokes.
 Created: April 22, 2025
+Updated: April 24, 2025
 
-## The Story of Sarcasm in Sound
+## The Science of Sarcasm Detection
 
 In a world where text analysis misses crucial emotional cues, we set out to capture what machines couldn't see: the subtle art of sarcasm. Our journey began with a simple question - what if we could visualize the sound of someone rolling their eyes?
 
@@ -14,8 +15,18 @@ Sarcasm isn't just what you say - it's how you say it. Our analysis reveals that
 - Exaggerated pitch variations that contradict literal meaning
 - Unique timing patterns that create emotional dissonance
 - Emphasis markers that signal the speaker's true intent
+- Deadpan delivery followed by subtle tonal shifts
 
-Using "The Void.mp3" as our case study, we discovered that spectrograms can reveal these invisible patterns - showing the frequency distributions and energy patterns that betray when someone's words don't match their meaning.
+Using spectrograms and advanced audio features, we can reveal these invisible patterns - showing the frequency distributions and energy patterns that betray when someone's words don't match their meaning.
+
+### Dad Joke Sarcasm: A Special Case
+
+Dad jokes present a unique challenge for sarcasm detection. Often delivered with intentional deadpan and subtle tonal shifts, their sarcasm is more nuanced than standard sarcastic speech. Our enhanced algorithm now specifically targets:
+
+- The deadpan-to-punchline shift characteristic of dad joke delivery
+- Subtle timing patterns with strategic pauses before punchlines
+- Minimal but significant pitch inflections at key moments
+- The contrast between setup and delivery in the punchline region
 
 ### A Journey Through Emotional Space
 
@@ -26,14 +37,14 @@ Our breakthrough came with the development of the Emotional Flow Visualization -
 - **Emphasis** (Size): Where larger points highlight the key moments of sarcastic expression
 - **Time** (Color): Where the pattern of emotional shifts unfolds before your eyes
 
-### What We Discovered
+### Advanced Features
 
-The patterns were unmistakable. When someone speaks sarcastically, they create distinctive signatures in emotional space:
-- Clusters of high arousal paired with unexpected valence
-- Temporal transitions that differ dramatically from sincere speech
-- Exaggerated emphasis patterns that signal emotional incongruence
+The latest version implements several sophisticated analysis techniques:
 
-These acoustic patterns allow us to detect what once seemed impossible to capture - the subtle art of saying one thing while meaning another.
+- **Punchline Detection**: Automatic identification of joke punchlines through timing and tonal patterns
+- **Spectral Contrast Analysis**: Detecting subtle variations in vocal tone characteristic of sarcastic speech
+- **Deadpan Factor**: Measuring flat affect followed by tonal shifts - a hallmark of dad joke delivery
+- **Temporal Weighting**: Enhanced sensitivity to sarcasm indicators in punchline regions
 
 ### Mapping the Emotional Landscape
 
@@ -50,6 +61,35 @@ Each region of our emotional space corresponds to familiar feelings:
 
 Yet sarcastic speech refuses to follow the normal rules, jumping across these boundaries in ways that reveal the speaker's true intent.
 
+## Technical Details
+
+The system employs a multi-layered approach to sarcasm detection:
+
+1. **Audio Preprocessing**: 
+   - High-quality audio conversion using ffmpeg
+   - Adaptive analysis window selection based on audio duration
+   - Specialized frame sizing for short utterances like dad jokes
+
+2. **Feature Extraction**:
+   - Root Mean Square (RMS) energy for loudness detection
+   - Spectral centroid for pitch and tonal qualities
+   - Spectral flatness for deadpan delivery identification
+   - Spectral contrast for emotional variance
+   - Onset detection for timing analysis
+   - Pitch tracking with magnitude weighting
+
+3. **Dad Joke Analysis**:
+   - Pause detection for timing analysis
+   - Pitch inflection tracking
+   - Punchline region identification
+   - Vocal pattern changes at critical points
+
+4. **Visualization Pipeline**:
+   - Spectrogram generation for frequency analysis
+   - 4D scatter plots for emotional flow visualization
+   - Time-series analysis of sarcasm scores
+   - Vocal characteristic plots with key indicators
+
 ## Requirements
 
 - Python 3.6+
@@ -58,6 +98,7 @@ Yet sarcastic speech refuses to follow the normal rules, jumping across these bo
   - soundfile
   - librosa
   - matplotlib
+  - scipy
   - ffmpeg (external dependency)
 
 ## Installation
@@ -70,19 +111,77 @@ git clone https://github.com/yourusername/sarcasm-audio-detector.git
 cd sarcasm-audio-detector
 
 # Install dependencies
-pip install numpy soundfile librosa matplotlib
+pip install numpy soundfile librosa matplotlib scipy
 ```
 
 ## Usage
 
-Place your audio file in the project directory and run:
+### Basic Usage
+
+Place your audio file in the project directory and update the file_path variable in sarcasm_detector.py:
 
 ```python
+file_path = 'your_audio_file.m4a'  # Replace with your file
+```
+
+Then run:
+
+```bash
 python sarcasm_detector.py
 ```
 
-The script will generate visualizations that reveal the hidden emotional landscape of speech, showing you what the words alone could never tell.
+### Example Files
+
+The repository includes:
+- `voice.m4a`: Sample dad joke for testing ("My wife told me to do lunges to stay in shape…I guess that's a big step forward.")
+- `graph.py`: Helper module for additional visualizations
+- `image.png`: Example output visualization
+
+### Interpreting Results
+
+The script outputs:
+- **Overall Sarcasm Score**: Scale of 0-10 indicating sarcasm intensity
+- **Sarcasm Probability**: Percentage likelihood of sarcastic intent (0-95%)
+- **Punchline Impact**: Measurement of punchline effectiveness 
+- **Timing Quality**: Analysis of pause placement and speech rhythm
+- **Verdict**: Qualitative assessment of sarcasm level
+
+### Visualizations
+
+Four visualization panels are generated:
+1. **Dad Joke Delivery Analysis**: Scatter plot showing intensity vs. tone with time-based coloring
+2. **Sarcasm Detection Score**: Time-series plot of sarcasm intensity with punchline marker
+3. **Dad Joke Vocal Characteristics**: Multiple feature plot showing volume, pitch, deadpan factor, and vocal expression
+4. **Joke Timing & Delivery**: Analysis of pauses, pitch tracking and pitch changes
+
+## Advanced Configuration
+
+For advanced users, several parameters can be tuned:
+- Frame length and hop size for different resolution analysis
+- Pause detection threshold for timing sensitivity
+- Punchline region definition (default is last third of audio)
+- Sarcasm formula weighting for different speech styles
+
+## Future Development
+
+Planned enhancements:
+- Multi-speaker sarcasm differentiation
+- Cultural variation modeling for international sarcasm
+- Real-time sarcasm detection API
+- Expanded dad joke corpus for improved pattern recognition
 
 ## License
 
 [MIT](LICENSE)
+
+## Citation
+
+If you use this tool in research, please cite:
+```
+@software{sarcasm_detector,
+  author = {Your Name},
+  title = {Sarcasm Audio Detector},
+  year = {2025},
+  url = {https://github.com/yourusername/sarcasm-audio-detector}
+}
+```
