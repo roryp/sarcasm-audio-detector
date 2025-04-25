@@ -345,20 +345,20 @@ if transcribed_text:
         indicators_text = "\n".join([f"- {ind[0]} ({ind[1]:.2f})" for ind in text_indicators])
         ax2.annotate(
             f"AI Model Analysis Score: {text_sarcasm_score:.2f}\nIndicators:\n{indicators_text}", 
-            xy=(0.05, 0.05), 
+            xy=(0.05, 0.75), # Moved much higher to avoid any overlap with x-axis
             xycoords='axes fraction', 
             fontsize=10,
-            va='bottom',
+            va='top',
             bbox=dict(boxstyle='round,pad=0.5', facecolor='yellow', alpha=0.5),
             wrap=True
         )
     else:
         ax2.annotate(
             f"AI Model Analysis Score: {text_sarcasm_score:.2f}\nNo strong indicators detected in text",
-            xy=(0.05, 0.05), 
+            xy=(0.05, 0.75), # Moved much higher to avoid any overlap with x-axis
             xycoords='axes fraction', 
             fontsize=10,
-            va='bottom',
+            va='top',
             bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.5)
         )
 
