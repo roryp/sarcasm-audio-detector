@@ -341,14 +341,26 @@ text_sarcasm_score, text_indicators = text_analyzer.analyze_text(transcribed_tex
 # Add text analysis to the plot
 if transcribed_text:
     if text_indicators:
-        indicators_text = ", ".join([f"{ind[0]} ({ind[1]:.2f})" for ind in text_indicators])
-        ax2.annotate(f"AI Model Analysis Score: {text_sarcasm_score:.2f}\nIndicators: {indicators_text}", 
-                    xy=(0.05, 0.05), xycoords='axes fraction', fontsize=9,
-                    bbox=dict(boxstyle='round', facecolor='yellow', alpha=0.5))
+        # Format the indicators text with line breaks to prevent truncation
+        indicators_text = "\n".join([f"- {ind[0]} ({ind[1]:.2f})" for ind in text_indicators])
+        ax2.annotate(
+            f"AI Model Analysis Score: {text_sarcasm_score:.2f}\nIndicators:\n{indicators_text}", 
+            xy=(0.05, 0.05), 
+            xycoords='axes fraction', 
+            fontsize=10,
+            va='bottom',
+            bbox=dict(boxstyle='round,pad=0.5', facecolor='yellow', alpha=0.5),
+            wrap=True
+        )
     else:
-        ax2.annotate(f"AI Model Analysis Score: {text_sarcasm_score:.2f}\nNo strong indicators detected in text",
-                    xy=(0.05, 0.05), xycoords='axes fraction', fontsize=9,
-                    bbox=dict(boxstyle='round', facecolor='white', alpha=0.5))
+        ax2.annotate(
+            f"AI Model Analysis Score: {text_sarcasm_score:.2f}\nNo strong indicators detected in text",
+            xy=(0.05, 0.05), 
+            xycoords='axes fraction', 
+            fontsize=10,
+            va='bottom',
+            bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.5)
+        )
 
 # Mark punchline region
 ax2.axvspan(times[punchline_region.start], times[-1], alpha=0.2, color='yellow', label='Punchline Region')
